@@ -1,0 +1,421 @@
+"use client";
+
+import { template } from "@/constants";
+import { cn } from "@/lib/utils";
+import Konva from "konva";
+import { NodeConfig } from "konva/lib/Node";
+import "quill/dist/quill.snow.css";
+import { useContext, useEffect, useRef, useState } from "react";
+import {
+  Circle,
+  Ellipse,
+  Image as KonvaImage,
+  Layer,
+  Rect,
+  Stage,
+  Text,
+  Transformer,
+} from "react-konva";
+import CroppableKonvaImage from "./croppable-konva-image";
+import { SidebarEditorContext } from "./sidebar/SidebarEditorProvider";
+
+function useImage(url: string) {
+  const [image, setImage] = useState<HTMLImageElement | null>(null);
+
+  useEffect(() => {
+    const img = new window.Image();
+    img.src = url;
+    img.onload = () => setImage(img);
+  }, [url]);
+
+  return image;
+}
+
+export default function TemplateEditor() {
+  const {
+    elements,
+    setSelectedElement,
+    openedTab,
+    shapes,
+    layerRef,
+    selectedId,
+    setSelectedId,
+    selectedImageId,
+    setSelectedImageId,
+    images,
+    setSelectedShape,
+    selectedShapeId,
+    setSelectedShapeId,
+    handleDeselect,
+    setCropPreviewCanvas,
+    setSelectedImage,
+    stageRef,
+  } = useContext(SidebarEditorContext);
+  const bgImage = useImage(template.background?.src || "");
+  const transformerRef = useRef<Konva.Transformer | null>(null);
+
+  const handleTextSelect = (element: NodeConfig) => {
+    handleDeselect();
+
+    const node = layerRef?.current?.findOne(`#${element.id}`);
+    setSelectedId(element.id || null);
+    setSelectedElement(node || null);
+  };
+  const handleImageSelect = (element: NodeConfig) => {
+    handleDeselect();
+
+    const node = layerRef?.current?.findOne(`#${element.id}`);
+    setSelectedImageId(element.id || null);
+    setSelectedImage(node || null);
+  };
+  const handleShapeSelect = (element: NodeConfig) => {
+    handleDeselect();
+    const node = layerRef?.current?.findOne(`#${element.id}`);
+    setSelectedShapeId(element.id || null);
+    setSelectedShape(node || null);
+  };
+
+  const sceneWidth = 600;
+  const sceneHeight = 400;
+
+  const [stageSize, setStageSize] = useState({
+    width: sceneWidth,
+    height: sceneHeight,
+    scale: 1,
+  });
+  const containerRef = useRef<HTMLDivElement>(null);
+  const updateSize = () => {
+    if (!containerRef.current) return;
+
+    const containerWidth = containerRef.current.offsetWidth;
+
+    const scale = containerWidth / sceneWidth;
+
+    setStageSize({
+      width: sceneWidth * scale,
+      height: sceneHeight * scale,
+      scale: scale,
+    });
+  };
+
+  useEffect(() => {
+    updateSize();
+    window.addEventListener("resize", updateSize);
+
+    return () => {
+      window.removeEventListener("resize", updateSize);
+    };
+  }, []);
+  return (
+    <>
+      <div
+        ref={containerRef}
+        className={cn("flex gap-4 relative", !!openedTab ? "" : "")}
+      >
+        {typeof window !== "undefined" && (
+          <Stage
+            ref={stageRef}
+            width={stageSize.width}
+            height={stageSize.height}
+            scaleX={stageSize.scale}
+            scaleY={stageSize.scale}
+            onMouseDown={(e) => {
+              if (e.target === e.target.getStage()) {
+                handleDeselect();
+              }
+            }}
+          >
+            <Layer ref={layerRef}>
+              {bgImage && (
+                <KonvaImage
+                  image={bgImage}
+                  width={600}
+                  height={400}
+                  listening={false}
+                />
+              )}
+              {elements.map((el, i) =>
+                el.type === "text" ? (
+                  <Text
+                    id={el.id}
+                    key={i}
+                    text={el.text}
+                    x={el.x}
+                    y={el.y}
+                    align={el.textAlign}
+                    fontSize={el.fontSize}
+                    fontFamily={el.fontFamily}
+                    fill={el.fill}
+                    fontStyle={el.fontStyle}
+                    shadowColor={el.shadowColor}
+                    shadowOpacity={el.shadowOpacity}
+                    shadowBlur={el.shadowBlur}
+                    shadowOffsetX={el.shadowOffsetX}
+                    shadowOffsetY={el.shadowOffsetY}
+                    shadowEnabled={el.shadowEnabled}
+                    stroke={el.stroke}
+                    strokeWidth={el.strokeWidth}
+                    draggable
+                    opacity={el.opacity}
+                    onDragStart={() => handleTextSelect(el)}
+                    onClick={() => handleTextSelect(el)}
+                    onTap={() => handleTextSelect(el)}
+                    width={200}
+                    onTransform={(e) => {
+                      const node = e.target;
+                      const scaleX = node.scaleX();
+
+                      node.width(node.width() * scaleX);
+
+                      node.scaleX(1);
+                    }}
+                  />
+                ) : null
+              )}
+              {images.map((el, i) =>
+                el.type === "image" ? (
+                  <CroppableKonvaImage
+                    id={el.id}
+                    key={i}
+                    x={el.x}
+                    y={el.y}
+                    width={el.width}
+                    height={el.height}
+                    image={el.image}
+                    draggable
+                    onDragStart={() => handleImageSelect(el)}
+                    onClick={() => handleImageSelect(el)}
+                  />
+                ) : null
+              )}
+              {shapes.map((el, i) => {
+                if (el.type === "circle") {
+                  return (
+                    <Circle
+                      id={el.id}
+                      key={i}
+                      shadowBlur={el.shadowBlur}
+                      shadowColor={el.shadowColor}
+                      shadowEnabled={el.shadowEnabled}
+                      shadowOffsetX={el.shadowOffsetX}
+                      shadowOffsetY={el.shadowOffsetY}
+                      x={el.x}
+                      y={el.y}
+                      radius={el.radius || el.width || 20 / 2}
+                      width={el.width}
+                      height={el.height}
+                      draggable
+                      stroke={el.stroke || "#ffffff"}
+                      strokeEnabled={el.strokeEnabled}
+                      // fillAfterStrokeEnabled={false}
+                      strokeWidth={el.strokeWidth || 1}
+                      fill={el.fill}
+                      onDragStart={() => handleShapeSelect(el)}
+                      onClick={() => handleShapeSelect(el)}
+                    />
+                  );
+                } else if (el.type === "rect" || el.type === "rectangle") {
+                  return (
+                    <Rect
+                      id={el.id}
+                      key={i}
+                      x={el.x}
+                      y={el.y}
+                      fill={el.fill}
+                      width={el.width}
+                      height={el.height}
+                      stroke={el.stroke || "#ffffff"}
+                      strokeEnabled={el.strokeEnabled}
+                      // fillAfterStrokeEnabled={false}
+                      strokeWidth={el.strokeWidth || 1}
+                      draggable
+                      onDragStart={() => handleShapeSelect(el)}
+                      onClick={() => handleShapeSelect(el)}
+                    />
+                  );
+                } else if (el.type === "ellipse") {
+                  return (
+                    <Ellipse
+                      id={el.id}
+                      key={i}
+                      x={el.x}
+                      stroke={el.stroke || "#ffffff"}
+                      strokeEnabled={el.strokeEnabled}
+                      // fillAfterStrokeEnabled={false}
+                      strokeWidth={el.strokeWidth || 1}
+                      y={el.y}
+                      fill={el.fill}
+                      radiusX={el.radiusX || 40}
+                      radiusY={el.radiusY || 100}
+                      draggable
+                      onDragStart={() => handleShapeSelect(el)}
+                      onClick={() => handleShapeSelect(el)}
+                    />
+                  );
+                }
+                return null;
+              })}
+              <Transformer
+                ref={transformerRef}
+                nodes={
+                  selectedId
+                    ? [
+                        transformerRef.current
+                          ?.getStage()
+                          ?.findOne(`#${selectedId}`),
+                      ]
+                    : []
+                }
+                anchorCornerRadius={4}
+                enabledAnchors={["middle-left", "middle-right"]}
+                boundBoxFunc={(oldBox, newBox) => {
+                  if (newBox.width < 50) return oldBox;
+                  return newBox;
+                }}
+              />
+              <Transformer
+                ref={transformerRef}
+                nodes={
+                  selectedImageId
+                    ? [
+                        transformerRef.current
+                          ?.getStage()
+                          ?.findOne(`#${selectedImageId}`),
+                      ]
+                    : []
+                }
+                anchorCornerRadius={4}
+                enabledAnchors={[
+                  "middle-left",
+                  "middle-right",
+                  "top-left",
+                  "top-right",
+                  "bottom-right",
+                  "bottom-left",
+                ]}
+                boundBoxFunc={(oldBox, newBox) => {
+                  if (newBox.width < 50) return oldBox;
+                  return newBox;
+                }}
+              />
+              <Transformer
+                ref={transformerRef}
+                nodes={
+                  selectedShapeId
+                    ? [
+                        transformerRef.current
+                          ?.getStage()
+                          ?.findOne(`#${selectedShapeId}`),
+                      ]
+                    : []
+                }
+                resizeEnabled={true}
+                anchorStyleFunc={(anchor) => {
+                  if (
+                    anchor.hasName("top-left") ||
+                    anchor.hasName("top-right") ||
+                    anchor.hasName("bottom-left") ||
+                    anchor.hasName("bottom-right")
+                  ) {
+                    anchor.size({ width: 8, height: 8 });
+                  }
+                  if (anchor.hasName("middle-left")) {
+                    const node = transformerRef.current?.nodes()[0];
+                    if (node) {
+                      const nodeHeight = node.height() * node.scaleY();
+                      const nodeWidth = node.width() * node.scaleX();
+                      anchor.height(nodeHeight);
+                      anchor.width(4);
+                      anchor.x(0); // Position at the left edge (opposite of right edge positioning)
+                      anchor.y(0);
+                      anchor.offsetX(0);
+                      anchor.offsetY(-2.8);
+                      anchor.fill("transparent");
+                      anchor.stroke("transparent");
+                    }
+                  }
+                  if (anchor.hasName("middle-right")) {
+                    const node = transformerRef.current?.nodes()[0];
+                    if (node) {
+                      // Check if it's a circle
+                      const nodeHeight = node.height() * node.scaleY();
+                      const nodeWidth = node.width() * node.scaleX();
+                      if (node.className === "Circle") {
+                        anchor.height(nodeHeight);
+                        anchor.width(4);
+                        anchor.x(node.width() * node.scaleX() - 1);
+                        anchor.y(0);
+                        anchor.offsetX(0);
+                        anchor.offsetY(0);
+                        anchor.fill("transparent");
+                        anchor.stroke("transparent");
+                      } else {
+                        const nodeHeight = node.height() * node.scaleY();
+                        const nodeWidth = node.width() * node.scaleX();
+                        anchor.height(nodeHeight);
+                        anchor.width(4);
+                        anchor.x(nodeWidth);
+                        anchor.y(0);
+                        anchor.offsetX(0);
+                        anchor.offsetY(-2.8);
+                        anchor.fill("transparent");
+                        anchor.stroke("transparent");
+                      }
+                    }
+                  }
+                  if (anchor.hasName("top-center")) {
+                    const node = transformerRef.current?.nodes()[0];
+                    if (node) {
+                      const nodeHeight = node.height() * node.scaleY();
+                      const nodeWidth = node.width() * node.scaleX();
+                      anchor.width(nodeWidth);
+                      anchor.height(5);
+                      anchor.x(0);
+                      anchor.y(0);
+                      anchor.offsetX(-2.8);
+                      anchor.offsetY(0);
+                      anchor.fill("transparent");
+                      anchor.stroke("transparent");
+                    }
+                  }
+                  if (anchor.hasName("bottom-center")) {
+                    const node = transformerRef.current?.nodes()[0];
+                    if (node) {
+                      const nodeHeight = node.height() * node.scaleY();
+                      const nodeWidth = node.width() * node.scaleX();
+                      anchor.width(nodeWidth);
+                      anchor.height(5);
+                      anchor.x(0);
+                      anchor.y(nodeHeight + 1);
+                      anchor.offsetX(-2.5);
+                      anchor.offsetY(0.5);
+                      anchor.fill("transparent");
+                      anchor.stroke("transparent");
+                    }
+                  }
+                }}
+                anchorCornerRadius={4}
+                enabledAnchors={[
+                  "top-left",
+                  "top-right",
+                  "bottom-left",
+                  "bottom-right",
+                  "top-center",
+                  "bottom-center",
+                  "middle-left",
+                  "middle-right",
+                ]}
+                boundBoxFunc={(oldBox, newBox) => {
+                  if (newBox.width < 5 || newBox.height < 5) {
+                    return oldBox;
+                  }
+                  return newBox;
+                }}
+              />
+            </Layer>
+          </Stage>
+        )}
+      </div>
+    </>
+  );
+}
