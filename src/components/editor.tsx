@@ -26,7 +26,7 @@ const Editor = () => {
   const { selectedElement, selectedImage, selectedShape } =
     useContext(SidebarEditorContext);
   return (
-    <div className="flex flex-col w-full justify-center items-center">
+    <div className="flex  flex-col w-fit m-auto justify-center items-center">
       {selectedElement && <TextToolbar />}
       {selectedImage && <ImageToolbar />}
       {selectedShape && <ShapeToolbar />}

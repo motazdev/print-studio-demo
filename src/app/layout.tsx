@@ -57,7 +57,7 @@ export default function RootLayout({
           >
             <SidebarProvider className="w-full">
               <AppSidebar />
-              <main className="flex w-full items-start">
+              <main className="flex w-full bg-gray-200 items-start">
                 <div className="">
                   <TabsContent
                     closeTab={closeTabs}

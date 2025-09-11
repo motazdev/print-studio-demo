@@ -18,7 +18,8 @@ import {
 } from "react-konva";
 import CroppableKonvaImage from "./croppable-konva-image";
 import { SidebarEditorContext } from "./sidebar/SidebarEditorProvider";
-
+import { Html } from "react-konva-utils";
+import { Textarea } from "./ui/textarea";
 function useImage(url: string) {
   const [image, setImage] = useState<HTMLImageElement | null>(null);
 
@@ -38,6 +39,7 @@ export default function TemplateEditor() {
     openedTab,
     shapes,
     layerRef,
+    setElements,
     selectedId,
     setSelectedId,
     selectedImageId,
@@ -47,14 +49,16 @@ export default function TemplateEditor() {
     selectedShapeId,
     setSelectedShapeId,
     handleDeselect,
+    selectedElement,
     setCropPreviewCanvas,
     setSelectedImage,
     stageRef,
   } = useContext(SidebarEditorContext);
   const bgImage = useImage(template.background?.src || "");
   const transformerRef = useRef<Konva.Transformer | null>(null);
-
+  const [isEditingText, setIsEditingText] = useState(false);
   const handleTextSelect = (element: NodeConfig) => {
+    setIsEditingText(true);
     handleDeselect();
 
     const node = layerRef?.current?.findOne(`#${element.id}`);
@@ -78,6 +82,8 @@ export default function TemplateEditor() {
   const sceneWidth = 600;
   const sceneHeight = 400;
 
+  // Get current text for selected element
+
   const [stageSize, setStageSize] = useState({
     width: sceneWidth,
     height: sceneHeight,
@@ -97,7 +103,12 @@ export default function TemplateEditor() {
       scale: scale,
     });
   };
-
+  const [text, setText] = useState<null | string>(null);
+  useEffect(() => {
+    if (selectedElement && selectedElement.getAttr("text")) {
+      setText(selectedElement.getAttr("text"));
+    }
+  }, [selectedElement]);
   useEffect(() => {
     updateSize();
     window.addEventListener("resize", updateSize);
@@ -106,14 +117,29 @@ export default function TemplateEditor() {
       window.removeEventListener("resize", updateSize);
     };
   }, []);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  // Function to update text in the elements array
+  // Handle real-time text updates
+  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    if (selectedElement && selectedId) {
+      const newText = e.target.value;
+      // Update the Konva node immediately
+      selectedElement.setAttr("text", newText);
+      // Force redraw
+      layerRef?.current?.batchDraw();
+    }
+  };
+
   return (
     <>
       <div
         ref={containerRef}
-        className={cn("flex gap-4 relative", !!openedTab ? "" : "")}
+        className={cn("flex gap-4  relative", !!openedTab ? "" : "")}
       >
         {typeof window !== "undefined" && (
           <Stage
+            className="bg-white"
             ref={stageRef}
             width={stageSize.width}
             height={stageSize.height}
@@ -126,12 +152,44 @@ export default function TemplateEditor() {
             }}
           >
             <Layer ref={layerRef}>
+              {selectedElement && isEditingText && (
+                <Html>
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: selectedElement.y() ? selectedElement.y() - 60 : 0,
+                      left: selectedElement.x()
+                        ? selectedElement.x() + (selectedElement.width() - 180)
+                        : 0,
+                      resize: "none",
+                    }}
+                    className="rounded-2xl bg-white w-40  p-2"
+                  >
+                    <Textarea
+                      ref={textareaRef}
+                      onChange={handleTextareaChange}
+                      defaultValue={selectedElement.getAttr("text") || ""}
+                      key={selectedId} // Force remount when different text is selected
+                      className="  !min-h-8 resize-none max-h-10 px-2 shadow-sm border-0 rounded-lg bg-white"
+                    />
+                  </div>
+                </Html>
+              )}
               {bgImage && (
                 <KonvaImage
                   image={bgImage}
                   width={600}
+                  id={"bg-image"}
                   height={400}
-                  listening={false}
+                  listening={true}
+                  draggable
+                  onClick={() => {
+                    handleDeselect();
+                    setSelectedImageId("bg-image");
+                    setSelectedImage(
+                      layerRef?.current?.findOne(`#bg-image`) || null
+                    );
+                  }}
                 />
               )}
               {elements.map((el, i) =>
@@ -157,7 +215,10 @@ export default function TemplateEditor() {
                     strokeWidth={el.strokeWidth}
                     draggable
                     opacity={el.opacity}
-                    onDragStart={() => handleTextSelect(el)}
+                    onDragStart={() => {
+                      handleTextSelect(el);
+                      setIsEditingText(false);
+                    }}
                     onClick={() => handleTextSelect(el)}
                     onTap={() => handleTextSelect(el)}
                     width={200}
@@ -267,10 +328,61 @@ export default function TemplateEditor() {
                     : []
                 }
                 anchorCornerRadius={4}
+                rotateLineVisible={false}
                 enabledAnchors={["middle-left", "middle-right"]}
                 boundBoxFunc={(oldBox, newBox) => {
                   if (newBox.width < 50) return oldBox;
                   return newBox;
+                }}
+              />
+              <Transformer
+                nodes={
+                  selectedId
+                    ? [
+                        transformerRef.current
+                          ?.getStage()
+                          ?.findOne(`#${selectedId}`),
+                      ]
+                    : []
+                }
+                ref={transformerRef}
+                rotateEnabled={true}
+                ignoreStroke={true}
+                rotateLineVisible={false}
+                rotateAnchorOffset={0}
+                onTransformStart={() => setIsEditingText(false)}
+                rotationSnaps={[]} // Disable automatic snapping
+                // Prevent the automatic flip
+                flipEnabled={false}
+                anchorStyleFunc={(anchor) => {
+                  if (anchor.hasName("rotater") && selectedElement) {
+                    anchor.fill("orange");
+                    anchor.stroke("black");
+                    anchor.cornerRadius(100);
+                    anchor.strokeWidth(2);
+                    anchor.fill("white");
+                    anchor.on("mouseenter", () => {
+                      document.body.style.cursor = "url('/image.png'), auto";
+                    });
+                    anchor.on("mouseleave", () => {
+                      document.body.style.cursor = "default";
+                    });
+                  }
+                }}
+                rotateAnchorCursor={"url('/image.png'), auto"}
+                enabledAnchors={[]}
+                // Handle transform events to prevent unwanted flipping
+                onTransform={() => {
+                  const node = transformerRef.current
+                    ?.getStage()
+                    ?.findOne(`#${selectedId}`);
+                  if (node) {
+                    // Keep rotation within -180 to 180 range without auto-flipping
+                    let rotation = node.rotation();
+                    if (rotation > 180) rotation -= 360;
+                    if (rotation < -180) rotation += 360;
+                    node.rotation(rotation);
+                  }
                 }}
               />
               <Transformer
@@ -394,6 +506,32 @@ export default function TemplateEditor() {
                     }
                   }
                 }}
+                anchorCornerRadius={4}
+                enabledAnchors={[
+                  "top-left",
+                  "top-right",
+                  "bottom-left",
+                  "bottom-right",
+                  "top-center",
+                  "bottom-center",
+                  "middle-left",
+                  "middle-right",
+                ]}
+                boundBoxFunc={(oldBox, newBox) => {
+                  if (newBox.width < 5 || newBox.height < 5) {
+                    return oldBox;
+                  }
+                  return newBox;
+                }}
+              />
+              <Transformer
+                ref={transformerRef}
+                nodes={
+                  selectedShapeId
+                    ? [transformerRef.current?.getStage()?.findOne(`#bg-image`)]
+                    : []
+                }
+                resizeEnabled={true}
                 anchorCornerRadius={4}
                 enabledAnchors={[
                   "top-left",

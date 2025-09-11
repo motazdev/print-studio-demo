@@ -1,9 +1,11 @@
 "use client";
 
 import {
+  ArrowUpFromLine,
   Blend,
   Bold,
   Italic,
+  Layers,
   TextAlignCenter,
   TextAlignEnd,
   TextAlignStart,
@@ -65,7 +67,7 @@ const TextToolbar = () => {
   }, [selectedElement]);
 
   return (
-    <div className="flex fixed top-0 mt-4 border rounded-2xl shadow-sm">
+    <div className="flex bg-white fixed top-0 mt-4 border rounded-2xl shadow-sm">
       <div className="flex flex-row items-center gap-2 p-2">
         <input
           type="color"
@@ -75,6 +77,7 @@ const TextToolbar = () => {
             selectedElement?.setAttr("fill", e.target.value);
           }}
         />
+
         <select
           value={fontSize}
           onChange={(e) => {
@@ -105,7 +108,52 @@ const TextToolbar = () => {
             </option>
           ))}
         </select>
-
+        <Tooltip>
+          <Popover>
+            <TooltipTrigger asChild>
+              <PopoverTrigger asChild>
+                <Button className="cursor-pointer bg-transparent hover:bg-gray-200 text-black shadow-none">
+                  <Layers />
+                </Button>
+              </PopoverTrigger>
+            </TooltipTrigger>
+            <TooltipContent>Arrange Layer</TooltipContent>
+            <PopoverContent className="flex flex-col max-w-[200px] gap-2">
+              <Button
+                className="bg-white text-black shadow-lg hover:shadow-sm cursor-pointer hover:bg-gray-200/50"
+                onClick={() => {
+                  selectedElement?.moveToTop();
+                }}
+              >
+                Bring to front
+              </Button>
+              <Button
+                className="bg-white text-black shadow-lg hover:shadow-sm cursor-pointer hover:bg-gray-200/50"
+                onClick={() => {
+                  selectedElement?.moveUp();
+                }}
+              >
+                Bring forward
+              </Button>
+              <Button
+                className="bg-white text-black shadow-lg hover:shadow-sm cursor-pointer hover:bg-gray-200/50"
+                onClick={() => {
+                  selectedElement?.moveDown();
+                }}
+              >
+                Send backward
+              </Button>
+              <Button
+                className="bg-white text-black shadow-lg hover:shadow-sm cursor-pointer hover:bg-gray-200/50"
+                onClick={() => {
+                  selectedElement?.moveToBottom();
+                }}
+              >
+                Send to back
+              </Button>
+            </PopoverContent>
+          </Popover>
+        </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>
             <Toggle

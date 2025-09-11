@@ -33,7 +33,7 @@ const ImageToolbar = () => {
   };
 
   return (
-    <>
+    <div className="flex bg-white fixed top-0 mt-4 border rounded-2xl shadow-sm">
       {selectedImage && (
         <div className="flex flex-row items-center gap-2 p-2">
           {/* Crop Controls */}
@@ -98,7 +98,7 @@ const ImageToolbar = () => {
           )}
         </div>
       )}
-    </>
+    </div>
   );
 };
 
