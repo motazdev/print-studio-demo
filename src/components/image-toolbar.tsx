@@ -1,5 +1,5 @@
 "use client";
-import { Blend, Crop, Check, X } from "lucide-react";
+import { Blend, Crop, Check, X, Layers } from "lucide-react";
 import React, { useContext, useState } from "react";
 import { SidebarEditorContext } from "./sidebar/SidebarEditorProvider";
 
@@ -80,6 +80,52 @@ const ImageToolbar = () => {
               </Popover>
             </TooltipTrigger>
             <TooltipContent>Image Opacity</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <Popover>
+              <TooltipTrigger disabled={isCropping} asChild>
+                <PopoverTrigger disabled={isCropping} asChild>
+                  <Button className="cursor-pointer bg-transparent hover:bg-gray-200 text-black shadow-none">
+                    <Layers />
+                  </Button>
+                </PopoverTrigger>
+              </TooltipTrigger>
+              <TooltipContent>Arrange Layer</TooltipContent>
+              <PopoverContent className="flex flex-col max-w-[200px] gap-2">
+                <Button
+                  className="bg-white text-black shadow-lg hover:shadow-sm cursor-pointer hover:bg-gray-200/50"
+                  onClick={() => {
+                    selectedImage?.moveToTop();
+                  }}
+                >
+                  Bring to front
+                </Button>
+                <Button
+                  className="bg-white text-black shadow-lg hover:shadow-sm cursor-pointer hover:bg-gray-200/50"
+                  onClick={() => {
+                    selectedImage?.moveUp();
+                  }}
+                >
+                  Bring forward
+                </Button>
+                <Button
+                  className="bg-white text-black shadow-lg hover:shadow-sm cursor-pointer hover:bg-gray-200/50"
+                  onClick={() => {
+                    selectedImage?.moveDown();
+                  }}
+                >
+                  Send backward
+                </Button>
+                <Button
+                  className="bg-white text-black shadow-lg hover:shadow-sm cursor-pointer hover:bg-gray-200/50"
+                  onClick={() => {
+                    selectedImage?.moveToBottom();
+                  }}
+                >
+                  Send to back
+                </Button>
+              </PopoverContent>
+            </Popover>
           </Tooltip>
         </div>
       )}
