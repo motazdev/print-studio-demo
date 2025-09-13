@@ -15,57 +15,37 @@ export const SidebarEditorContext = React.createContext<{
   setSelectedImage: React.Dispatch<
     React.SetStateAction<Node<NodeConfig> | null>
   >;
+  setIsCropping: React.Dispatch<React.SetStateAction<boolean>>;
   images: Konva.ImageConfig[];
   stageRef: React.RefObject<Konva.Stage | null>;
-
+  isCropping: boolean;
   shapes: Konva.ShapeConfig[];
   selectedElement: Node<NodeConfig> | null;
   selectedShape: Node<NodeConfig> | null;
   setSelectedShape: React.Dispatch<
     React.SetStateAction<Node<NodeConfig> | null>
   >;
+  handleCropCancel: () => void;
   selectedImage: Node<NodeConfig> | null;
   openedTab: "text" | "other" | null;
   setOpenedTab: React.Dispatch<React.SetStateAction<"text" | "other" | null>>;
-  cropMode: string | null;
-  setCropMode: React.Dispatch<React.SetStateAction<string | null>>;
-  cropArea: { x: number; y: number; width: number; height: number } | null;
-  setCropArea: (
-    value:
-      | ({
-          x: number;
-          y: number;
-          width: number;
-          height: number;
-        } | null)
-      | ((
-          prevState: {
-            x: number;
-            y: number;
-            width: number;
-            height: number;
-          } | null
-        ) => { x: number; y: number; width: number; height: number } | null)
-  ) => void;
-  applyCrop: () => void;
+
   layerRef?: React.RefObject<Konva.Layer | null>;
-  cancelCrop: () => void;
   updateElement?: (id: string, updates: Partial<Konva.TextConfig>) => void;
   updateImage: (id: string, updates: Partial<Konva.ImageConfig>) => void;
-  cropPreviewCanvas: HTMLCanvasElement | null;
-  setCropPreviewCanvas: React.Dispatch<
-    React.SetStateAction<HTMLCanvasElement | null>
-  >;
   setSelectedId: React.Dispatch<React.SetStateAction<string | null>>;
   selectedId: string | null;
   setSelectedImageId: React.Dispatch<React.SetStateAction<string | null>>;
   selectedImageId: string | null;
   setSelectedShapeId: React.Dispatch<React.SetStateAction<string | null>>;
   selectedShapeId: string | null;
-  downloadCropAsBlob: () => Promise<Blob | null>;
   handleDeselect: () => void;
+  handleCropSave: (newImageUrl: string) => void;
   handleExport: () => void;
-
+  imageToCrop: Konva.ImageConfig | null;
+  setImageToCrop: React.Dispatch<
+    React.SetStateAction<Konva.ImageConfig | null>
+  >;
   handleSelect: (
     node: Node<NodeConfig>,
     id: string,
@@ -74,32 +54,29 @@ export const SidebarEditorContext = React.createContext<{
   undo: () => void;
   redo: () => void;
 }>({
+  imageToCrop: null,
   images: template.images,
   shapes: template.shapes,
+  setImageToCrop: () => {},
   elements: template.elements,
   setElements: () => {},
   setImages: () => {},
   setShapes: () => {},
+  isCropping: false,
+
   setSelectedElement: () => {},
   setSelectedShape: () => {},
   selectedShape: null,
   setSelectedImage: () => {},
+  handleCropSave: () => {},
   stageRef: React.createRef<Konva.Stage>(),
   selectedElement: null,
   selectedImage: null,
   openedTab: null,
+  handleCropCancel: () => {},
   setOpenedTab: () => {},
-  cropMode: null,
-  setCropMode: () => {},
-  cropArea: null,
-  setCropArea: () => {},
-  applyCrop: () => {},
-  cancelCrop: () => {},
   updateElement: () => {},
   updateImage: () => {},
-  cropPreviewCanvas: null,
-  setCropPreviewCanvas: () => {},
-  downloadCropAsBlob: async () => null,
   setSelectedId: () => {},
   selectedId: null,
   setSelectedImageId: () => {},
@@ -112,6 +89,7 @@ export const SidebarEditorContext = React.createContext<{
   handleExport: () => {},
   undo: () => {},
   redo: () => {},
+  setIsCropping: () => {},
 });
 
 export function SidebarEditorProvider({
@@ -140,16 +118,40 @@ export function SidebarEditorProvider({
   const [selectedShape, setSelectedShape] = useState<Node<NodeConfig> | null>(
     null
   );
-  const [cropMode, setCropMode] = useState<string | null>(null);
-  const [cropArea, _setCropArea] = useState<{
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  } | null>(null);
-  const [cropPreviewCanvas, setCropPreviewCanvas] =
-    useState<HTMLCanvasElement | null>(null);
 
+  const [isCropping, setIsCropping] = useState(false);
+  const [imageToCrop, setImageToCrop] = useState<null | Konva.ImageConfig>(
+    null
+  );
+  const handleCropSave = (newImageUrl: string) => {
+    console.log({ newImageUrl });
+
+    const newImg = new window.Image();
+    newImg.crossOrigin = "anonymous"; // safe if you export later
+    newImg.src = newImageUrl;
+    newImg.onload = () => {
+      // update Konva node directly
+      selectedImage?.setAttr("image", newImg);
+      selectedImage?.getLayer()?.batchDraw();
+
+      // also update your React state if needed
+      setImages((prevImages) =>
+        prevImages.map((img) =>
+          img.id === selectedImage?.getAttr("id")
+            ? { ...img, image: newImg, src: newImageUrl }
+            : img
+        )
+      );
+      setSelectedImageId(newImg.id);
+      setIsCropping(false);
+      setImageToCrop(null);
+    };
+  };
+
+  const handleCropCancel = () => {
+    setIsCropping(false);
+    setImageToCrop(null);
+  };
   const [elements, setElements] = useState<Konva.TextConfig[]>(
     template.elements
   );
@@ -164,75 +166,6 @@ export function SidebarEditorProvider({
   const [openedTab, setOpenedTab] = useState<"text" | "other" | null>(null);
   const layerRef = useRef<Konva.Layer | null>(null);
 
-  const setCropArea = useCallback(
-    (
-      value:
-        | {
-            x: number;
-            y: number;
-            width: number;
-            height: number;
-          }
-        | ((
-            prevState: {
-              x: number;
-              y: number;
-              width: number;
-              height: number;
-            } | null
-          ) => {
-            x: number;
-            y: number;
-            width: number;
-            height: number;
-          } | null)
-        | null
-    ) => {
-      if (typeof value === "function") {
-        _setCropArea((prevState) => {
-          const area = value(prevState);
-          if (!area || !selectedImage) {
-            return area;
-          }
-          const imgX = selectedImage.getAttr("x") ?? 0;
-          const imgY = selectedImage.getAttr("y") ?? 0;
-          const imgW = selectedImage.getAttr("width") ?? 0;
-          const imgH = selectedImage.getAttr("height") ?? 0;
-
-          const x = Math.max(area.x, imgX);
-          const y = Math.max(area.y, imgY);
-          let width = Math.min(area.width, imgW - (x - imgX));
-          let height = Math.min(area.height, imgH - (y - imgY));
-
-          width = Math.max(1, width);
-          height = Math.max(1, height);
-
-          return { x, y, width, height };
-        });
-      } else {
-        if (!value || !selectedImage) {
-          _setCropArea(value);
-          return;
-        }
-        const imgX = selectedImage.getAttr("x") ?? 0;
-        const imgY = selectedImage.getAttr("y") ?? 0;
-        const imgW = selectedImage.getAttr("width") ?? 0;
-        const imgH = selectedImage.getAttr("height") ?? 0;
-
-        const x = Math.max(value.x, imgX);
-        const y = Math.max(value.y, imgY);
-        let width = Math.min(value.width, imgW - (x - imgX));
-        let height = Math.min(value.height, imgH - (y - imgY));
-
-        width = Math.max(1, width);
-        height = Math.max(1, height);
-
-        _setCropArea({ x, y, width, height });
-      }
-    },
-    [selectedImage]
-  );
-
   // Utility function to update image elements
   const updateImage = useCallback(
     (id: string, updates: Partial<Konva.ImageConfig>) => {
@@ -242,73 +175,6 @@ export function SidebarEditorProvider({
     },
     []
   );
-
-  const applyCrop = useCallback(async () => {
-    if (cropMode && cropArea && selectedImage && cropPreviewCanvas) {
-      try {
-        // Convert the preview canvas to a new image
-        const croppedBlob = await new Promise<Blob>((resolve) => {
-          cropPreviewCanvas.toBlob((blob) => {
-            if (blob) resolve(blob);
-          }, "image/png");
-        });
-
-        // Create new image element from cropped data
-        const croppedImageUrl = URL.createObjectURL(croppedBlob);
-        const newImage = new Image();
-
-        await new Promise<void>((resolve) => {
-          newImage.onload = () => {
-            // Update the image in our state with the cropped version
-            updateImage(cropMode, {
-              image: newImage,
-              x: cropArea.x,
-              y: cropArea.y,
-              width: cropArea.width,
-              height: cropArea.height,
-            });
-
-            // Update the Konva node directly
-            if (selectedImage) {
-              selectedImage.setAttr("image", newImage);
-              selectedImage.x(cropArea.x);
-              selectedImage.y(cropArea.y);
-              selectedImage.width(cropArea.width);
-              selectedImage.height(cropArea.height);
-              selectedImage.getLayer()?.batchDraw();
-            }
-
-            // Clean up
-            URL.revokeObjectURL(croppedImageUrl);
-            resolve();
-          };
-          newImage.src = croppedImageUrl;
-        });
-      } catch (error) {
-        console.error("Error applying crop:", error);
-      }
-    }
-
-    setCropMode(null);
-    setCropArea(null);
-    setCropPreviewCanvas(null);
-  }, [cropMode, cropArea, selectedImage, cropPreviewCanvas, updateImage]);
-
-  const cancelCrop = useCallback(() => {
-    setCropMode(null);
-    setCropArea(null);
-    setCropPreviewCanvas(null);
-  }, []);
-
-  const downloadCropAsBlob = useCallback(async (): Promise<Blob | null> => {
-    if (!cropPreviewCanvas) return null;
-
-    return new Promise((resolve) => {
-      cropPreviewCanvas.toBlob((blob) => {
-        resolve(blob);
-      }, "image/png");
-    });
-  }, [cropPreviewCanvas]);
 
   const handleDeselect = useCallback(() => {
     setSelectedId(null);
@@ -412,11 +278,15 @@ export function SidebarEditorProvider({
         elements,
         shapes,
         setSelectedImage,
+        setImageToCrop,
+        handleCropCancel,
+        handleCropSave,
         selectedImage,
         layerRef,
         setElements,
         handleExport,
         stageRef,
+        imageToCrop,
         setImages,
         setShapes,
         setSelectedElement,
@@ -424,20 +294,13 @@ export function SidebarEditorProvider({
         openedTab,
         images,
         setOpenedTab,
-        cropMode,
-        setCropMode,
-        cropArea,
-        setCropArea,
-        applyCrop,
-        cancelCrop,
         selectedId,
         selectedImageId,
         setSelectedId,
         setSelectedImageId,
+        isCropping,
+        setIsCropping,
         updateImage,
-        cropPreviewCanvas,
-        setCropPreviewCanvas,
-        downloadCropAsBlob,
         selectedShape,
         selectedShapeId,
         setSelectedShape,

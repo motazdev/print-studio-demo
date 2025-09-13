@@ -45,15 +45,20 @@ export default function TemplateEditor() {
     selectedId,
     setSelectedId,
     selectedImageId,
+    setImageToCrop,
     setSelectedImageId,
     images,
+    handleCropCancel,
+    handleCropSave,
     setSelectedShape,
     selectedShapeId,
     selectedImage,
     setSelectedShapeId,
+    isCropping,
+    imageToCrop,
+    setIsCropping,
     handleDeselect,
     selectedElement,
-    setCropPreviewCanvas,
     setImages,
     setSelectedImage,
     stageRef,
@@ -134,50 +139,7 @@ export default function TemplateEditor() {
       layerRef?.current?.batchDraw();
     }
   };
-  const [isCropping, setIsCropping] = useState(false);
-  const [imageToCrop, setImageToCrop] = useState<null | Konva.ImageConfig>(
-    null
-  );
-  // const [images, setImages] = useState([
-  //   {
-  //     id: "yoda-image",
-  //     type: "image",
-  //     imageUrl: "https://konvajs.org/assets/yoda.jpg",
-  //     x: 50,
-  //     y: 50,
-  //     width: 200,
-  //     height: 150,
-  //   },
-  // ]);
-  const handleCropSave = (newImageUrl: string) => {
-    console.log({ newImageUrl });
 
-    const newImg = new window.Image();
-    newImg.crossOrigin = "anonymous"; // safe if you export later
-    newImg.src = newImageUrl;
-    newImg.onload = () => {
-      // update Konva node directly
-      selectedImage?.setAttr("image", newImg);
-      selectedImage?.getLayer()?.batchDraw();
-
-      // also update your React state if needed
-      setImages((prevImages) =>
-        prevImages.map((img) =>
-          img.id === selectedImage?.getAttr("id")
-            ? { ...img, image: newImg, src: newImageUrl }
-            : img
-        )
-      );
-      setSelectedImageId(newImg.id);
-      setIsCropping(false);
-      setImageToCrop(null);
-    };
-  };
-
-  const handleCropCancel = () => {
-    setIsCropping(false);
-    setImageToCrop(null);
-  };
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Delete") {
@@ -195,8 +157,6 @@ export default function TemplateEditor() {
               ?.destroy();
           }
         }
-
-        console.log("Delete key pressed!");
       }
     };
 
@@ -215,27 +175,6 @@ export default function TemplateEditor() {
   ]);
   return (
     <>
-      {selectedImageId && (
-        <div className="absolute top-4 right-4 z-10">
-          <button
-            onClick={() => {
-              setSelectedImageId(null);
-              console.log({ selectedImageId });
-              // Trigger the cropping modal when the button is clicked
-              const imageToCrop = images.find(
-                (img) => img.id === selectedImageId
-              );
-              if (imageToCrop) {
-                setImageToCrop(imageToCrop);
-                setIsCropping(true);
-              }
-            }}
-            className="bg-blue-500 text-white px-4 py-2 rounded"
-          >
-            Start Cropping
-          </button>
-        </div>
-      )}
       <div
         ref={containerRef}
         className={cn("flex gap-4  relative", !!openedTab ? "" : "")}
