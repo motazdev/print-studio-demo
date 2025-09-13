@@ -1,5 +1,5 @@
 "use client";
-import { Download, Images, Shapes, Type } from "lucide-react";
+import { Download, Images, Shapes, Type, Undo } from "lucide-react";
 
 import {
   Sidebar,
@@ -11,8 +11,12 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { SidebarEditorProvider } from "./sidebar/SidebarEditorProvider";
+import {
+  SidebarEditorContext,
+  SidebarEditorProvider,
+} from "./sidebar/SidebarEditorProvider";
 import ExportButton from "./export-button";
+import { useContext } from "react";
 
 // Menu items.
 const items = [
@@ -43,14 +47,15 @@ const items = [
 ];
 
 export function AppSidebar() {
+  const { undo, redo } = useContext(SidebarEditorContext);
   return (
     <Sidebar>
       <SidebarContent>
         <SidebarGroup>
-          {/* <SidebarGroupLabel>Application</SidebarGroupLabel> */}
-          <SidebarGroupContent className="mt-4">
-            <SidebarMenu className="flex justify-center flex-col mt-24 items-center">
+          <SidebarGroupContent className="mt-35">
+            <SidebarMenu className="flex justify-center flex-col items-center">
               <TabsList className="flex flex-col gap-2 w-full">
+                {/* Your mapped items */}
                 {items.map((item) => {
                   if (item.type === "export") {
                     return (
@@ -75,6 +80,21 @@ export function AppSidebar() {
                     );
                   }
                 })}
+
+                {/* --- UNDO BUTTON MOVED HERE --- */}
+                <SidebarMenuItem className="w-full">
+                  {/* Note: This is now a simple button, not a TabsTrigger */}
+                  <SidebarMenuButton
+                    onClick={() => undo()}
+                    asChild
+                    className="size-full"
+                  >
+                    <div className="flex flex-col w-full">
+                      <Undo className={"size-20"} />
+                      <span>Undo</span>
+                    </div>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
               </TabsList>
             </SidebarMenu>
           </SidebarGroupContent>

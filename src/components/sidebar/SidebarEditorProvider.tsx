@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback, useRef, useEffect } from "react";
 import { template } from "@/constants/index";
 import Konva from "konva";
 import { Node, NodeConfig } from "konva/lib/Node";
@@ -71,6 +71,8 @@ export const SidebarEditorContext = React.createContext<{
     id: string,
     type: "text" | "image"
   ) => void;
+  undo: () => void;
+  redo: () => void;
 }>({
   images: template.images,
   shapes: template.shapes,
@@ -108,6 +110,8 @@ export const SidebarEditorContext = React.createContext<{
   handleDeselect: () => {},
   handleSelect: () => {},
   handleExport: () => {},
+  undo: () => {},
+  redo: () => {},
 });
 
 export function SidebarEditorProvider({
@@ -335,6 +339,73 @@ export function SidebarEditorProvider({
     [handleDeselect]
   );
 
+  // History (UNDO - Redo)
+  const [history, setHistory] = useState([
+    {
+      elements: template.elements,
+      images: template.images,
+      shapes: template.shapes,
+    },
+  ]);
+  const [historyStep, setHistoryStep] = useState(0);
+  const isHistoryNavigation = useRef(false); // Effect to capture state changes and add them to the history stack
+
+  useEffect(() => {
+    // If the state change was caused by an undo/redo action, don't create a new history entry
+    if (isHistoryNavigation.current) {
+      isHistoryNavigation.current = false;
+      return;
+    }
+
+    // Create a snapshot of the current state
+    const currentState = { elements, images, shapes };
+
+    // Get the history up to the current point in time
+    const newHistory = history.slice(0, historyStep + 1);
+
+    // Add the new state snapshot to the history
+    setHistory([...newHistory, currentState]);
+
+    // Move the history pointer to the latest state
+    setHistoryStep(newHistory.length);
+  }, [elements, images, shapes]); // This effect runs whenever canvas elements change
+
+  const undo = useCallback(() => {
+    console.log({ historyStep });
+    if (historyStep === 0) {
+      return; // Nothing to undo
+    }
+
+    isHistoryNavigation.current = true; // Flag to prevent creating a new history entry
+    const newStep = historyStep - 1;
+    const previousState = history[newStep]; // Revert to the previous state
+
+    setElements(previousState.elements);
+    setImages(previousState.images);
+    setShapes(previousState.shapes);
+    setHistoryStep(newStep);
+    console.log("test");
+    handleDeselect(); // Clear any selection
+  }, [history, historyStep, handleDeselect]);
+
+  const redo = useCallback(() => {
+    if (historyStep === history.length - 1) {
+      return; // Nothing to redo
+    }
+
+    isHistoryNavigation.current = true; // Flag to prevent creating a new history entry
+    const newStep = historyStep + 1;
+    const nextState = history[newStep]; // Move forward to the next state
+
+    setElements(nextState.elements);
+    setImages(nextState.images);
+    setShapes(nextState.shapes);
+    setHistoryStep(newStep);
+
+    handleDeselect(); // Clear any selection
+  }, [history, historyStep, handleDeselect]);
+
+  // --- END OF UNDO/REDO IMPLEMENTATION ---
   return (
     <SidebarEditorContext.Provider
       value={{
@@ -373,6 +444,8 @@ export function SidebarEditorProvider({
         setSelectedShapeId,
         handleDeselect,
         handleSelect,
+        undo,
+        redo,
       }}
     >
       {children}

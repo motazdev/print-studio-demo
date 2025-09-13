@@ -72,7 +72,10 @@ function TabsContent({ className, closeTab, ...props }: TabsContentProps) {
   return (
     <TabsPrimitive.Content
       data-slot="tabs-content"
-      className={cn("flex-1 relative outline-none", className)}
+      className={cn(
+        "flex-1 relative bg-white rounded-2xl outline-none",
+        className
+      )}
       {...props}
     >
       {closeTab && (
